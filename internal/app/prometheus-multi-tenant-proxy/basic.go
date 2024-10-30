@@ -15,6 +15,8 @@ const (
 	Namespaces key = iota
 	//Labels Key used to pass prometheus additional labels though the middleware context
 	Labels key = iota
+	MetricsWhitelist key = iota
+	ExportedMetrics key = iota
 	realm      = "Prometheus multi-tenant proxy"
 )
 
@@ -62,15 +64,15 @@ func (auth *BasicAuth) Load() bool {
 
 // IsAuthorized uses the basic authentication and the Authn file to authenticate a user
 // and return the namespace he has access to
-func (auth *BasicAuth) IsAuthorized(r *http.Request) (bool, []string, map[string][]string) {
+func (auth *BasicAuth) IsAuthorized(r *http.Request) (bool, []string, map[string][]string, []string, []string) {
 	user, pass, ok := r.BasicAuth()
 	if !ok {
-		return false, nil, nil
+		return false, nil, nil, nil, nil
 	}
 	return auth.isAuthorized(user, pass)
 }
 
-func (auth *BasicAuth) isAuthorized(user, pass string) (bool, []string, map[string][]string) {
+func (auth *BasicAuth) isAuthorized(user, pass string) (bool, []string, map[string][]string, []string, []string) {
 	authConfig := auth.getConfig()
 	for _, v := range authConfig.Users {
 		if subtle.ConstantTimeCompare([]byte(user), []byte(v.Username)) == 1 && subtle.ConstantTimeCompare([]byte(pass), []byte(v.Password)) == 1 {
@@ -84,10 +86,10 @@ func (auth *BasicAuth) isAuthorized(user, pass string) (bool, []string, map[stri
 			if v.Namespaces != nil {
 				namespaces = append(namespaces, v.Namespaces...)
 			}
-			return true, namespaces, v.Labels
+			return true, namespaces, v.Labels, v.MetricsWhitelist, v.ExportedMetrics
 		}
 	}
-	return false, nil, nil
+	return false, nil, nil, nil, nil
 }
 
 // WriteUnauthorisedResponse writes a 401 Unauthorized HTTP response with

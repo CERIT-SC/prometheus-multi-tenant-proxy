@@ -131,11 +131,11 @@ func (auth *JwtAuth) loadFromFile(location *string) bool {
 
 // IsAuthorized validates the user by verifying the JWT token in
 // the request and returning the namespaces claim found in token the payload.
-func (auth *JwtAuth) IsAuthorized(r *http.Request) (bool, []string, map[string][]string) {
+func (auth *JwtAuth) IsAuthorized(r *http.Request) (bool, []string, map[string][]string, []string, []string) {
 	tokenString := extractTokens(&r.Header)
 	if tokenString == "" {
 		log.Printf("Token is missing from header request")
-		return false, nil, nil
+		return false, nil, nil, nil, nil
 	}
 	return auth.isAuthorized(tokenString)
 }
@@ -146,11 +146,11 @@ func (auth *JwtAuth) WriteUnauthorisedResponse(w http.ResponseWriter) {
 	w.Write([]byte("Unauthorised\n"))
 }
 
-func (auth *JwtAuth) isAuthorized(tokenString string) (bool, []string, map[string][]string) {
+func (auth *JwtAuth) isAuthorized(tokenString string) (bool, []string, map[string][]string, []string, []string) {
 	token, err := jwt.ParseWithClaims(tokenString, &NamespaceClaim{}, auth.jwks.Keyfunc)
 	if err != nil || !token.Valid {
 		log.Printf("%s\n", err)
-		return false, nil, nil
+		return false, nil, nil, nil, nil
 	}
 
 	claims := token.Claims.(*NamespaceClaim)
@@ -160,7 +160,7 @@ func (auth *JwtAuth) isAuthorized(tokenString string) (bool, []string, map[strin
 	if claims.Labels == nil {
 		claims.Labels = make(map[string][]string)
 	}
-	return true, claims.Namespaces, claims.Labels
+	return true, claims.Namespaces, claims.Labels, nil, nil
 }
 
 func extractTokens(headers *http.Header) string {

@@ -18,6 +18,8 @@ type User struct {
 	Namespace  string              `yaml:"namespace"`
 	Namespaces []string            `yaml:"namespaces"`
 	Labels     map[string][]string `yaml:"labels"`
+	MetricsWhitelist []string      `yaml:"metricswhitelist"`
+	ExportedMetrics []string       `yaml:"exportedMetrics"`
 }
 
 // ParseConfig read a configuration file in the path `location` and returns an Authn object

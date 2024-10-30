@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"regexp"
 
-	injector "github.com/prometheus-community/prom-label-proxy/injectproxy"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/promql/parser"
 )
@@ -45,7 +45,10 @@ func (r *ReversePrometheusRoundTripper) Director(req *http.Request) {
 
 func (r *ReversePrometheusRoundTripper) modifyRequest(req *http.Request, prometheusFormParameter string) error {
 
-	namespaces := req.Context().Value(Namespaces).([]string)
+	var namespacesRe []string
+	var namespaces []string
+	metricswhitelist := req.Context().Value(MetricsWhitelist).([]string)
+	exportedmetrics := req.Context().Value(ExportedMetrics).([]string)
 	l := req.Context().Value(Labels).(map[string][]string)
 
 	// Convert the labels map into a slice of label matchers.
@@ -58,6 +61,15 @@ func (r *ReversePrometheusRoundTripper) modifyRequest(req *http.Request, prometh
 			Type:  labels.MatchRegexp,
 			Value: combinedValue,
 		})
+	}
+
+	for _, n := range req.Context().Value(Namespaces).([]string) {
+		match, _ := regexp.MatchString("[*?|]", n)
+		if(match) {
+			namespacesRe = append(namespacesRe, n)
+		} else {
+			namespaces = append(namespaces, n)
+		}
 	}
 
 	if len(namespaces) == 1 {
@@ -76,7 +88,7 @@ func (r *ReversePrometheusRoundTripper) modifyRequest(req *http.Request, prometh
 		})
 	}
 
-	e := injector.NewPromQLEnforcer(false, labelMatchers...)
+	e := NewPromQLEnforcer(false, metricswhitelist, exportedmetrics, namespacesRe, labelMatchers...)
 
 	if err := req.ParseForm(); err != nil {
 		return err
@@ -92,7 +104,7 @@ func (r *ReversePrometheusRoundTripper) modifyRequest(req *http.Request, prometh
 				return err
 			}
 			log.Printf("[QUERY]\t%s ORIGINAL: %s\n", req.RemoteAddr, expr)
-			if len(namespaces) == 0 && len(l) == 0 {
+			if len(namespaces) == 0 && len(l) == 0 && len(namespacesRe) == 0 {
 				log.Printf("[ERROR]\t%s\n", "no namespaces or labels found in request context")
 				// This is a hack to prevent the query from being executed.
 				value = ""

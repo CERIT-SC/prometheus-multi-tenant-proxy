@@ -12,7 +12,7 @@ type key int
 // Auth implements an authentication middleware
 type Auth interface {
 	// IsAuthorized authenticates a request and returns the list of namespaces the user has access to
-	IsAuthorized(r *http.Request) (bool, []string, map[string][]string)
+	IsAuthorized(r *http.Request) (bool, []string, map[string][]string, []string, []string)
 	// WriteUnauthorisedResponse writes an HTTP response in case the user is forbidden
 	WriteUnauthorisedResponse(w http.ResponseWriter)
 	// Load loads or reloads the configuration
@@ -23,12 +23,14 @@ type Auth interface {
 func AuthHandler(auth Auth, whitelist []string, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if whitelist != nil && !isInWhitelist(r.URL.Path, whitelist) {
+			log.Printf("Unauthorized due to whitelist")
 			auth.WriteUnauthorisedResponse(w)
 			return
 		}
 
-		authorized, namespaces, labels := auth.IsAuthorized(r)
+		authorized, namespaces, labels, whitelisted, exported := auth.IsAuthorized(r)
 		if !authorized {
+			log.Printf("Unauthorized due to namespace/labels")
 			auth.WriteUnauthorisedResponse(w)
 			return
 		}
@@ -39,6 +41,8 @@ func AuthHandler(auth Auth, whitelist []string, handler http.HandlerFunc) http.H
 		}
 		ctx := context.WithValue(r.Context(), Namespaces, namespaces)
 		ctx = context.WithValue(ctx, Labels, labels)
+		ctx = context.WithValue(ctx, MetricsWhitelist, whitelisted)
+		ctx = context.WithValue(ctx, ExportedMetrics, exported)
 		handler(w, r.WithContext(ctx))
 	}
 }

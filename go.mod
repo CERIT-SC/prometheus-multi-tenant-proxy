@@ -1,6 +1,6 @@
 module github.com/k8spin/prometheus-multi-tenant-proxy
 
-go 1.23
+go 1.22
 
 require (
 	github.com/MicahParks/keyfunc/v2 v2.1.0
